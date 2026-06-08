@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from src.models import Apartment, Bill, Parameters, Tenant, TenantSettlement, Transfer, ApartmentSettlement
 from typing import List, Tuple
 
@@ -52,6 +54,43 @@ class Manager:
             total_due_pln=total_cost
         )
     
+    def get_debtors(self, apartment_key: str, year: int, month: int) -> List[str] | None:
+        if month < 1 or month > 12:
+            raise ValueError("Month must be between 1 and 12")
+        if apartment_key not in self.apartments:
+            return None
+
+        tenants_in_apartment = [
+            (tenant_key, tenant)
+            for tenant_key, tenant in self.tenants.items()
+            if tenant.apartment == apartment_key
+        ]
+        if not tenants_in_apartment:
+            return []
+
+        transfers_by_tenant = {}
+        for transfer in self.transfers:
+            if transfer.settlement_year == year and transfer.settlement_month == month:
+                transfers_by_tenant[transfer.tenant] = transfers_by_tenant.get(transfer.tenant, 0.0) + transfer.amount_pln
+
+        return [
+            tenant.name
+            for tenant_key, tenant in tenants_in_apartment
+            if transfers_by_tenant.get(tenant_key, 0.0) < tenant.rent_pln
+        ]
+
+    def get_tax(self, year: int, month: int, tax_rate: float) -> int:
+        if month < 1 or month > 12:
+            raise ValueError("Month must be between 1 and 12")
+
+        total_revenue = sum(
+            transfer.amount_pln
+            for transfer in self.transfers
+            if transfer.settlement_year == year and transfer.settlement_month == month
+        )
+        tax_amount = Decimal(str(total_revenue)) * Decimal(str(tax_rate))
+        return int(tax_amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
     def create_tenants_settlements(self, apartment_settlement: ApartmentSettlement) -> List[TenantSettlement] | None:
         if apartment_settlement.month < 1 or apartment_settlement.month > 12:
             raise ValueError("Month must be between 1 and 12")
