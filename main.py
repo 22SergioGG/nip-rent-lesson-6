@@ -70,6 +70,33 @@ def print_usage():
     print("Example: python main.py apart-polanka 2025 1")
 
 
+def display_settlement(manager, apartment_key: str, year: int, month: int):
+    print_section_header("APARTMENT SETTLEMENT")
+    print(f"Apartment: {apartment_key}")
+    print(f"Period: {month}/{year}")
+
+    apartment_costs = manager.get_apartment_costs(apartment_key, year, month)
+    if apartment_costs is None:
+        print(f"No bills found for apartment '{apartment_key}' in {month}/{year}.")
+        return
+
+    print(f"Total apartment costs: {format_currency(apartment_costs)}")
+
+    apartment_settlement = manager.get_settlement(apartment_key, year, month)
+    if apartment_settlement is None:
+        print("Unable to create apartment settlement.")
+        return
+
+    tenant_settlements = manager.create_tenants_settlements(apartment_settlement)
+    if not tenant_settlements:
+        print("No tenants found for this apartment.")
+        return
+
+    print_subsection_header("Tenant shares")
+    for settlement in tenant_settlements:
+        print(f"  - {settlement.tenant}: {format_currency(settlement.total_due_pln)}")
+
+
 if __name__ == '__main__':
     parameters = Parameters()
     manager = Manager(parameters)
@@ -84,41 +111,12 @@ if __name__ == '__main__':
             print_usage()
             sys.exit(1)
 
-        print_section_header("APARTMENT SETTLEMENT")
-        print(f"Apartment: {apartment_key}")
-        print(f"Period: {month}/{year}")
-
-        apartment_costs = manager.get_apartment_costs(apartment_key, year, month)
-        if apartment_costs is None:
-            print(f"No apartment found with key '{apartment_key}' or no bills for this period.")
-            sys.exit(1)
-
-        print(f"Total apartment costs: {format_currency(apartment_costs)}")
-
-        debtors = manager.get_debtors(apartment_key, year, month)
-        print_subsection_header("Debtors")
-        if debtors:
-            for debtor in debtors:
-                print(f"  - {debtor}")
-        else:
-            print("  None")
-
-        tax = manager.get_tax(year, month, 0.085)
-        total_revenue = sum(
-            transfer.amount_pln
-            for transfer in manager.transfers
-            if transfer.settlement_year == year and transfer.settlement_month == month
-        )
-        print_subsection_header("Tax")
-        print(f"  Taxable revenue: {format_currency(total_revenue)}")
-        print(f"  Tax at 8.5%: {tax} PLN")
-    else:
-        if len(sys.argv) > 1:
-            print("Error: invalid number of arguments.")
-            print_usage()
-            sys.exit(1)
-
+        display_settlement(manager, apartment_key, year, month)
+    elif len(sys.argv) == 1:
         display_apartments(manager)
         display_tenants(manager)
+    else:
+        print_usage()
+        sys.exit(1)
 
     print(f"\n{'=' * 70}\n")
