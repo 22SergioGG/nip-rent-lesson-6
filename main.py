@@ -1,3 +1,5 @@
+import sys
+
 from src.manager import Manager
 from src.models import Parameters
 
@@ -63,11 +65,60 @@ def display_tenants(manager):
                 print(f"      • {format_currency(transfer.amount_pln):>15}  Date: {transfer.date}  Period: {month_year}")
 
 
+def print_usage():
+    print("Usage: python main.py <apartment_key> <year> <month>")
+    print("Example: python main.py apart-polanka 2025 1")
+
+
 if __name__ == '__main__':
     parameters = Parameters()
     manager = Manager(parameters)
 
-    display_apartments(manager)
-    display_tenants(manager)
-    
+    if len(sys.argv) == 4:
+        apartment_key = sys.argv[1]
+        try:
+            year = int(sys.argv[2])
+            month = int(sys.argv[3])
+        except ValueError:
+            print("Error: year and month must be integers.")
+            print_usage()
+            sys.exit(1)
+
+        print_section_header("APARTMENT SETTLEMENT")
+        print(f"Apartment: {apartment_key}")
+        print(f"Period: {month}/{year}")
+
+        apartment_costs = manager.get_apartment_costs(apartment_key, year, month)
+        if apartment_costs is None:
+            print(f"No apartment found with key '{apartment_key}' or no bills for this period.")
+            sys.exit(1)
+
+        print(f"Total apartment costs: {format_currency(apartment_costs)}")
+
+        debtors = manager.get_debtors(apartment_key, year, month)
+        print_subsection_header("Debtors")
+        if debtors:
+            for debtor in debtors:
+                print(f"  - {debtor}")
+        else:
+            print("  None")
+
+        tax = manager.get_tax(year, month, 0.085)
+        total_revenue = sum(
+            transfer.amount_pln
+            for transfer in manager.transfers
+            if transfer.settlement_year == year and transfer.settlement_month == month
+        )
+        print_subsection_header("Tax")
+        print(f"  Taxable revenue: {format_currency(total_revenue)}")
+        print(f"  Tax at 8.5%: {tax} PLN")
+    else:
+        if len(sys.argv) > 1:
+            print("Error: invalid number of arguments.")
+            print_usage()
+            sys.exit(1)
+
+        display_apartments(manager)
+        display_tenants(manager)
+
     print(f"\n{'=' * 70}\n")
